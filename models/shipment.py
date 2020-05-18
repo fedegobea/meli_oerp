@@ -488,6 +488,7 @@ class mercadolibre_shipment(models.Model):
 								'meli_shipping_cost': shipment.shipping_cost,
 								'meli_shipping_list_cost': shipment.shipping_list_cost,
 								'meli_paid_amount': shipment.order_cost,
+                                'meli_fee_amount': 0.0,
 								'meli_currency_id': all_orders[0]["currency_id"],
 								'meli_date_created': _ml_datetime(all_orders[0]["date_created"]) or '',
 								'meli_date_closed': _ml_datetime(all_orders[0]["date_closed"]) or '',
