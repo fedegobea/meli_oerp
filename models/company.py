@@ -39,6 +39,58 @@ class res_company(models.Model):
     def meli_get_object( self ):
         return True
 
+    def _get_ML_currencies(self):
+        #https://api.mercadolibre.com/currencies
+        meli_util_model = self.env['meli.util']
+        meli = meli_util_model.get_new_instance()
+        ML_currencies = [ ("ARS","Peso Argentino (ARS)"),
+                            ("MXN","Peso Mexicano (MXN)"),
+                            ("COP","Peso Colombiano (COP)"),
+                            ("PEN","Sol Peruano (PEN)"),
+                            ("BOB","Boliviano (BOB)"),
+                            ("BRL","Real (BRL)"),
+                            ("CLP","Peso Chileno (CLP)")]
+        if (meli):
+            response = meli.get("/currencies")
+            if (response):
+                ML_currencies = []
+                currencies = response.json()
+                for k in currencies:
+                    ML.append(( k["id"], k["description"] ))
+
+        return ML_currencies
+
+
+    def _get_ML_sites(self):
+        # to check api.mercadolibre.com/sites  > MLA
+        meli_util_model = self.env['meli.util']
+        meli = meli_util_model.get_new_instance()
+        ML_sites = {
+            "ARS": { "name": "Argentina", "id": "MLA", "default_currency_id": "ARS" },
+            "MXN": { "name": "México", "id": "MLM", "default_currency_id": "MXN" },
+            "COP": { "name": "Colombia", "id": "MCO", "default_currency_id": "COP" },
+            "PEN": { "name": "Perú", "id": "MPE", "default_currency_id": "PEN" },
+            "BOB": { "name": "Bolivia", "id": "MBO", "default_currency_id": "BOB" },
+            "BRL": { "name": "Brasil", "id": "MLB", "default_currency_id": "BRL" },
+            "CLP": { "name": "Chile", "id": "MLC", "default_currency_id": "CLP" },
+        }
+        response = meli.get("/sites")
+        if (response):
+            sites = response.json()
+            #_logger.info(sites)
+            for site in sites:
+                #_logger.info("site:")
+                #_logger.info(site)
+                _key_ = site["default_currency_id"]
+                ML_sites[_key_] = site
+
+        currency = self.mercadolibre_currency
+
+        #_logger.info(ML_sites)
+
+        if (currency and currency in ML_sites):
+            return ML_sites[currency]["id"]
+        return "MLA"
 
     def get_meli_state( self ):
         # recoger el estado y devolver True o False (meli)
@@ -139,9 +191,13 @@ class res_company(models.Model):
             _logger.info("company.mercadolibre_cron_get_update_products")
             self.meli_update_local_products()
 
-        if (company.mercadolibre_cron_post_update_products):
+        if (company.mercadolibre_cron_get_new_products):
+            _logger.info("company.mercadolibre_cron_get_new_products")
+            self.product_meli_get_products()
+
+        if (company.mercadolibre_cron_post_update_products or company.mercadolibre_cron_post_new_products):
             _logger.info("company.mercadolibre_cron_post_update_products")
-            self.meli_update_remote_products()
+            self.meli_update_remote_products(post_new=company.mercadolibre_cron_post_new_products)
 
         if (company.mercadolibre_cron_post_update_stock):
             _logger.info("company.mercadolibre_cron_post_update_stock")
@@ -188,8 +244,8 @@ class res_company(models.Model):
     mercadolibre_cron_get_orders_shipment = fields.Boolean(string='Importar envíos',help='Cron Get Orders Shipment')
     mercadolibre_cron_get_orders_shipment_client = fields.Boolean(string='Importar clientes',help='Cron Get Orders Shipment Client')
     mercadolibre_cron_get_questions = fields.Boolean(string='Importar preguntas',help='Cron Get Questions')
-    mercadolibre_cron_get_update_products = fields.Boolean(string='Actualizar productos',help='Cron Update Products')
-    mercadolibre_cron_post_update_products = fields.Boolean(string='Publicar productos',help='Cron Post Products, Product Templates or Variants with Meli Publication field checked')
+    mercadolibre_cron_get_update_products = fields.Boolean(string='Actualizar productos',help='Cron Update Products already imported')
+    mercadolibre_cron_post_update_products = fields.Boolean(string='Actualizar productos',help='Cron Update Posted Products, Product Templates or Variants with Meli Publication field checked')
     mercadolibre_cron_post_update_stock = fields.Boolean(string='Publicar Stock',help='Cron Post Updated Stock')
     mercadolibre_cron_post_update_price = fields.Boolean(string='Publicar Precio',help='Cron Post Updated Price')
     mercadolibre_create_website_categories = fields.Boolean(string='Crear categorías',help='Create Website eCommerce Categories from imported products ML categories')
@@ -199,13 +255,13 @@ class res_company(models.Model):
     mercadolibre_buying_mode = fields.Selection( [("buy_it_now","Compre ahora"),
                                                   ("classified","Clasificado")],
                                                   string='Método de compra predeterminado')
-    mercadolibre_currency = fields.Selection([("ARS","Peso Argentino (ARS)"),
-    ("MXN","Peso Mexicano (MXN)"),
-    ("COP","Peso Colombiano (COP)"),
-    ("PEN","Sol Peruano (PEN)"),
-    ("BOB","Boliviano (BOB)"),
-    ("BRL","Real (BRL)"),
-    ("CLP","Peso Chileno (CLP)")],
+    mercadolibre_currency = fields.Selection([  ("ARS","Peso Argentino (ARS)"),
+                                                ("MXN","Peso Mexicano (MXN)"),
+                                                ("COP","Peso Colombiano (COP)"),
+                                                ("PEN","Sol Peruano (PEN)"),
+                                                ("BOB","Boliviano (BOB)"),
+                                                ("BRL","Real (BRL)"),
+                                                ("CLP","Peso Chileno (CLP)")],
                                                 string='Moneda predeterminada')
     mercadolibre_condition = fields.Selection([ ("new", "Nuevo"),
                                                 ("used", "Usado"),
@@ -227,6 +283,15 @@ class res_company(models.Model):
         string='Valores excluidos',help='Seleccionar valores que serán excluidos para las publicaciones de variantes')
     mercadolibre_update_local_stock = fields.Boolean(string='Cron Get Products and take Stock from ML')
     mercadolibre_product_template_override_variant = fields.Boolean(string='Product template override Variant')
+    mercadolibre_product_template_override_method = fields.Selection(string='Método para Sobreescribir',
+                                                                    help='Método para Sobreescribir Titulo y Descripcion desde la información del Producto a la solapa de ML y sus variantes de ML',
+                                                                    selection=[
+                                                                        ('default','Predeterminado, sobreescribe descripcion solamente'),
+                                                                        ('description','Sobreescribir descripcion solamente'),
+                                                                        ('title','Sobreescribir título solamente'),
+                                                                        ('title_and_description','Sobreescribir titulo y descripcion')
+                                                                    ],
+                                                                    default='default')
     mercadolibre_order_confirmation = fields.Selection([ ("manual", "Manual"),
                                                 ("paid_confirm", "Pagado>Confirmado"),
                                                 ("paid_delivered", "Pagado>Entregado")],
@@ -239,8 +304,25 @@ class res_company(models.Model):
     #'mercadolibre_login': fields.selection( [ ("unknown", "Desconocida"), ("logged","Abierta"), ("not logged","Cerrada")],string='Estado de la sesión'), )
     mercadolibre_overwrite_template = fields.Boolean(string='Overwrite product template',help='Sobreescribir siempre Nombre y Descripción de la plantilla.')
     mercadolibre_overwrite_variant = fields.Boolean(string='Overwrite product variant',help='Sobreescribir siempre Nombre y Descripción de la variante.')
+    mercadolibre_process_notifications = fields.Boolean(string='Process all notifications',help='Procesar las notificaciones recibidas (/meli_notify)')
 
+    mercadolibre_create_product_from_order = fields.Boolean(string='Importar productos inexistentes',help='Importar productos desde la orden si no se encuentran en la base.')
+    mercadolibre_update_existings_variants = fields.Boolean(string='Actualiza/agrega variantes',help='Permite agregar y actualizar variantes de un producto existente (No recomendable cuando se está ya en modo Odoo a ML, solo usar cuando se importa por primera vez de ML a Odoo, para no romper el stock)')
+    mercadolibre_tax_included = fields.Selection( string='Tax Included',
+                                                  help='Esto se aplica al importar ordenes, productos y tambien al publicar, sobre la lista de precio seleccionada o sobre el precio de lista.',
+                                                  selection=[ ('auto','Configuración del sistema'),
+                                                              ('tax_included','Impuestos ya incluídos del precio de lista'),
+                                                              ('tax_excluded','Impuestos excluídos del precio de lista') ] )
 
+    mercadolibre_do_not_use_first_image = fields.Boolean(string="Do not use first image")
+    mercadolibre_cron_post_new_products = fields.Boolean(string='Incluir nuevos productos',help='Cron Post New Products, Product Templates or Variants with Meli Publication field checked')
+    mercadolibre_cron_get_new_products = fields.Boolean(string='Importar nuevos productos',help='Cron Import New Products, Product Templates or Variants')
+
+    mercadolibre_process_offset = fields.Char('Offset for pause all')
+    mercadolibre_post_default_code = fields.Boolean(string='Post SKU',help='Post Odoo default_code field for templates or variants to seller_custom_field in ML')
+    mercadolibre_import_search_sku = fields.Boolean(string='Search SKU',help='Search product by default_code')
+
+    mercadolibre_seller_user = fields.Many2one("res.users", string="Vendedor", help="Usuario con el que se registrarán las órdenes automáticamente")
 
     def	meli_logout(self):
         _logger.info('company.meli_logout() ')
@@ -273,6 +355,8 @@ class res_company(models.Model):
 
         CLIENT_ID = company.mercadolibre_client_id
         CLIENT_SECRET = company.mercadolibre_secret_key
+        REDIRECT_URI = company.mercadolibre_redirect_uri
+
         meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET)
 
         url_login_meli = meli.auth_url(redirect_URI=REDIRECT_URI)
@@ -328,6 +412,7 @@ class res_company(models.Model):
         CLIENT_SECRET = company.mercadolibre_secret_key
         ACCESS_TOKEN = company.mercadolibre_access_token
         REFRESH_TOKEN = company.mercadolibre_refresh_token
+        REDIRECT_URI = company.mercadolibre_redirect_uri
 
         meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET, access_token=ACCESS_TOKEN, refresh_token=REFRESH_TOKEN)
 
@@ -337,6 +422,10 @@ class res_company(models.Model):
         response = meli.get("/users/"+company.mercadolibre_seller_id+"/items/search", {'access_token':meli.access_token,'offset': 0 })
         rjson = response.json()
         _logger.info( rjson )
+
+        #if 'Error' in rjson:
+            #if ( rjson["Error"] == "The specified resource is not available at the moment." ):
+        #    return warningobj.info( title='MELI ERROR', message=rjson["Error"], message_html="" )
 
         if 'error' in rjson:
             if rjson['message']=='invalid_token' or rjson['message']=='expired_token':
@@ -440,10 +529,29 @@ class res_company(models.Model):
                         icommit = 0
                     _logger.info( item_id + "("+str(iitem)+"/"+str(rjson['paging']['total'])+")" )
                     posting_id = self.env['product.product'].search([('meli_id','=',item_id)])
+
                     response = meli.get("/items/"+item_id, {'access_token':meli.access_token})
                     rjson3 = response.json()
+                    if ( ( not posting_id or len(posting_id)==0 ) and company.mercadolibre_import_search_sku ):
+                        if ('seller_custom_field' in rjson3 and rjson3['seller_custom_field'] and len(rjson3['seller_custom_field'])):
+                            posting_id = self.env['product.product'].search([('default_code','=',rjson3['seller_custom_field'])])
+                            if (not posting_id or len(posting_id)==0):
+                                posting_id = self.env['product.template'].search([('default_code','=',rjson3['seller_custom_field'])])
+                                _logger.info("Founded template with default code, dont know how to handle it.")
+                            else:
+                                posting_id.meli_id = item_id
+                        if ('variations' in rjson3):
+                            for var in rjson3['variations']:
+                                if ('seller_custom_field' in var and var['seller_custom_field'] and len(var['seller_custom_field'])):
+                                    posting_id = self.env['product.product'].search([('default_code','=',var['seller_custom_field'])])
+                                    if (posting_id):
+                                        posting_id.meli_id = item_id
+                                        if (len(posting_id.product_tmpl_id.product_variant_ids)>1):
+                                            posting_id.meli_id_variation = var['id']
+
                     if (posting_id):
                         _logger.info( "Item already in database: " + str(posting_id[0]) )
+                    #elif (not company.mercadolibre_import_search_sku):
                     else:
                         #idcreated = self.pool.get('product.product').create(cr,uid,{ 'name': rjson3['title'], 'meli_id': rjson3['id'] })
                         if 'id' in rjson3:
@@ -479,9 +587,14 @@ class res_company(models.Model):
         return {}
 
 
-    def meli_update_remote_products(self):
+    def meli_post_new_remote_products(self):
+        _logger.info('company.meli_post_new_remote_products() ')
+        self.product_meli_update_remote_products(post_new=True)
+        return {}
+
+    def meli_update_remote_products(self,post_new=False):
         _logger.info('company.meli_update_remote_products() ')
-        self.product_meli_update_remote_products()
+        self.product_meli_update_remote_products(post_new=post_new)
         return {}
 
     def product_meli_update_local_products( self ):
@@ -493,6 +606,7 @@ class res_company(models.Model):
         CLIENT_SECRET = company.mercadolibre_secret_key
         ACCESS_TOKEN = company.mercadolibre_access_token
         REFRESH_TOKEN = company.mercadolibre_refresh_token
+        REDIRECT_URI = company.mercadolibre_redirect_uri
 
         meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET, access_token=ACCESS_TOKEN, refresh_token=REFRESH_TOKEN)
 
@@ -522,7 +636,7 @@ class res_company(models.Model):
 
         return {}
 
-    def product_meli_update_remote_products( self ):
+    def product_meli_update_remote_products( self, post_new = False ):
         _logger.info('company.product_meli_update_remote_products() ')
         company = self.env.user.company_id
         product_obj = self.env['product.product']
@@ -531,20 +645,34 @@ class res_company(models.Model):
         CLIENT_SECRET = company.mercadolibre_secret_key
         ACCESS_TOKEN = company.mercadolibre_access_token
         REFRESH_TOKEN = company.mercadolibre_refresh_token
+        REDIRECT_URI = company.mercadolibre_redirect_uri
 
         meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET, access_token=ACCESS_TOKEN, refresh_token=REFRESH_TOKEN)
 
         url_login_meli = meli.auth_url(redirect_URI=REDIRECT_URI)
-        product_ids = self.env['product.product'].search([('meli_pub','=',True),('meli_id','!=',False)])
-        _logger.info("product_ids to update:" + str(product_ids))
+        #product_ids = self.env['product.product'].search([('meli_pub','=',True),('meli_id','!=',False)])
+        product_ids = self.env['product.template'].search([('meli_pub','=',True)])
+        _logger.info("product_ids to update or create:" + str(product_ids))
 
         ret_messages = []
         if product_ids:
             for obj in product_ids:
                 try:
-                    _logger.info( "Product remote to update: " + str(obj.id)  )
-                    if (obj.meli_id and (obj.meli_status=='active')):
-                        res = obj.product_post()
+                    post_update = company.mercadolibre_cron_post_update_products
+                    updating = post_update and obj.meli_publications and len(obj.meli_publications)
+                    #(obj.meli_variants_status=='active')
+                    creating = post_new and ( not obj.meli_publications or ( obj.meli_publications and obj.meli_publications == '') )
+                    _logger.info(obj.name)
+                    _logger.info(obj.meli_publications)
+                    _logger.info(obj.meli_variants_status)
+                    if ( updating or creating):
+                        res = {}
+                        if (updating):
+                            _logger.info( "Product remote update: " + str(obj.id)  )
+                            res = obj.product_template_post()
+                        if (creating):
+                            _logger.info( "Product remote to create: " + str(obj.id)  )
+                            res = obj.with_context({'force_meli_pub': True }).product_template_post()
 
                         #we have a message
                         if 'res_id' in res:
@@ -567,7 +695,7 @@ class res_company(models.Model):
             report_body = ""
 
             for msg in report_messages:
-                report_body+= msg["obj"].name+": "+str(msg["obj"].meli_id)+"\n"
+                report_body+= msg["obj"].name+": "+str(msg["obj"].meli_publications)+"\n"
                 report_body+= "Mensaje: " + str(msg["message"]) + "\n"
                 report_body+= "\n"
 
@@ -634,5 +762,160 @@ class res_company(models.Model):
                     except Exception as e:
                         _logger.info("meli_update_remote_price > Exception founded!")
                         _logger.info(e, exc_info=True)
+
+
+    def meli_notifications(self):
+        #_logger.info("meli_notifications")
+        notifications = self.env['mercadolibre.notification']
+        if (self.mercadolibre_process_notifications):
+            return notifications.fetch_lasts()
+        return {}
+
+    def meli_set_automatic_tax_included(self):
+        #create a product with a price of 100, check if tax are created
+        #create an order with this product and check final amount in line.
+        return False
+
+    def meli_pause_all( self ):
+        _logger.info('company.meli_pause_all() ')
+        company = self.env.user.company_id
+        product_obj = self.pool.get('product.product')
+
+        CLIENT_ID = company.mercadolibre_client_id
+        CLIENT_SECRET = company.mercadolibre_secret_key
+        ACCESS_TOKEN = company.mercadolibre_access_token
+        REFRESH_TOKEN = company.mercadolibre_refresh_token
+        REDIRECT_URI = company.mercadolibre_redirect_uri
+
+        meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET, access_token=ACCESS_TOKEN, refresh_token=REFRESH_TOKEN)
+
+        url_login_meli = meli.auth_url(redirect_URI=REDIRECT_URI)
+
+        results = []
+        offset = 0
+        status = 'active'
+        if (company.mercadolibre_process_offset):
+            offset = company.mercadolibre_process_offset
+        response = meli.get("/users/"+company.mercadolibre_seller_id+"/items/search", {'status': status,'access_token':meli.access_token,'offset': offset })
+        rjson = response.json()
+        _logger.info( rjson )
+
+        if 'error' in rjson:
+            if rjson['message']=='invalid_token' or rjson['message']=='expired_token':
+                ACCESS_TOKEN = ''
+                REFRESH_TOKEN = ''
+                company.write({'mercadolibre_access_token': ACCESS_TOKEN, 'mercadolibre_refresh_token': REFRESH_TOKEN, 'mercadolibre_code': '' } )
+            return {
+            "type": "ir.actions.act_url",
+            "url": url_login_meli,
+            "target": "new",}
+
+
+        if 'results' in rjson:
+            results = rjson['results']
+
+        #download?
+        totalmax = rjson['paging']['total']
+        scroll_id = False
+        if (totalmax>1000):
+            #USE SCAN METHOD....
+            response = meli.get("/users/"+company.mercadolibre_seller_id+"/items/search",
+                                {'access_token':meli.access_token,
+                                'search_type': 'scan',
+                                'status': status,
+                                'offset': offset,
+                                'limit': '100' })
+            rjson = response.json()
+            _logger.info( rjson )
+            condition_last_off = True
+            if ('scroll_id' in rjson):
+                scroll_id = rjson['scroll_id']
+                ioff = rjson['paging']['limit']
+                results = rjson['results']
+                condition_last_off = False
+            while (condition_last_off!=True):
+                _logger.info( "Prefetch products ("+str(ioff)+"/"+str(rjson['paging']['total'])+")" )
+                response = meli.get("/users/"+company.mercadolibre_seller_id+"/items/search",
+                    {
+                    'access_token':meli.access_token,
+                    'search_type': 'scan',
+                    'scroll_id': scroll_id,
+                    'limit': '100'
+                    })
+                rjson2 = response.json()
+                if 'error' in rjson2:
+                    if rjson2['message']=='invalid_token' or rjson2['message']=='expired_token':
+                        ACCESS_TOKEN = ''
+                        REFRESH_TOKEN = ''
+                        company.write({'mercadolibre_access_token': ACCESS_TOKEN, 'mercadolibre_refresh_token': REFRESH_TOKEN, 'mercadolibre_code': '' } )
+                        condition = True
+                        return {
+                        "type": "ir.actions.act_url",
+                        "url": url_login_meli,
+                        "target": "new",}
+                    condition_last_off = True
+                else:
+                    results += rjson2['results']
+                    ioff+= rjson2['paging']['limit']
+                    if ('scroll_id' in rjson2):
+                        scroll_id = rjson2['scroll_id']
+                        condition_last_off = False
+                    else:
+                        condition_last_off = True
+
+        if (totalmax<=1000 and totalmax>rjson['paging']['limit']):
+            pages = rjson['paging']['total']/rjson['paging']['limit']
+            ioff = rjson['paging']['limit']
+            condition_last_off = False
+            while (condition_last_off!=True):
+                _logger.info( "Prefetch products ("+str(ioff)+"/"+str(rjson['paging']['total'])+")" )
+                response = meli.get("/users/"+company.mercadolibre_seller_id+"/items/search", {'access_token':meli.access_token,'offset': ioff })
+                rjson2 = response.json()
+                if 'error' in rjson2:
+                    if rjson2['message']=='invalid_token' or rjson2['message']=='expired_token':
+                        ACCESS_TOKEN = ''
+                        REFRESH_TOKEN = ''
+                        company.write({'mercadolibre_access_token': ACCESS_TOKEN, 'mercadolibre_refresh_token': REFRESH_TOKEN, 'mercadolibre_code': '' } )
+                        return {
+                        "type": "ir.actions.act_url",
+                        "url": url_login_meli,
+                        "target": "new",}
+                    condition_last_off = True
+                else:
+                    results += rjson2['results']
+                    ioff+= rjson['paging']['limit']
+                    condition_last_off = ( ioff>=totalmax)
+
+        _logger.info( results )
+        _logger.info( "FULL RESULTS: " + str(len(results)) )
+        _logger.info( "("+str(rjson['paging']['total'])+") products to check...")
+        iitem = 0
+        icommit = 0
+        micom = 5
+        if (results):
+            #self._cr.autocommit(False)
+            try:
+                for item_id in results:
+                    _logger.info(item_id)
+                    iitem+= 1
+                    icommit+= 1
+                    if (icommit>=micom):
+                        #self._cr.commit()
+                        icommit = 0
+                    _logger.info( item_id + "("+str(iitem)+"/"+str(rjson['paging']['total'])+")" )
+                    posting_id = self.env['product.product'].search([('meli_id','=',item_id)])
+                    if (posting_id):
+                        _logger.info( "meli_pause_all Item already in database: " + str(posting_id[0]) )
+                        #response = meli.get("/items/"+item_id, {'access_token':meli.access_token})
+                        #rjson3 = response.json()
+                    else:
+                        #idcreated = self.pool.get('product.product').create(cr,uid,{ 'name': rjson3['title'], 'meli_id': rjson3['id'] })
+                        #prod_fields['default_code'] = rjson3['id']
+                        response = meli.put("/items/"+item_id, { 'status': 'paused' }, {'access_token':meli.access_token})
+            except Exception as e:
+                _logger.info("meli_pause_all Exception!")
+                _logger.info(e, exc_info=True)
+                #self._cr.rollback()
+        return {}
 
 res_company()

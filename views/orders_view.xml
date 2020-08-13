@@ -2,14 +2,43 @@
 <odoo>
     <data>
 
+      <record id="sale_order_view_search_inherit_meli" model="ir.ui.view">
+          <field name="name">sale.order.search.inherit.meli</field>
+          <field name="model">sale.order</field>
+          <field name="inherit_id" ref="sale.sale_order_view_search_inherit_sale"/>
+          <field name="arch" type="xml">
+              <xpath expr="//filter[@name='my_sale_orders_filter']" position="after">
+                <field name="meli_order_id" string="MercadoLibre Order Id"/>
+                <separator/>
+                <filter string="MercadoLibre Orders" name="sale_orders_ml" domain="[('meli_order_id','!=',False)]" />
+              </xpath>
+          </field>
+      </record>
+
+      <record id="sale_order_view_search_inherit_quotation_meli" model="ir.ui.view">
+          <field name="name">sale.order.search.inherit.quotation.meli</field>
+          <field name="model">sale.order</field>
+          <field name="inherit_id" ref="sale.sale_order_view_search_inherit_quotation"/>
+          <field name="arch" type="xml">
+              <xpath expr="//filter[@name='my_quotation']" position="after">
+                <field name="meli_order_id" string="MercadoLibre Order Id"/>
+                <separator/>
+                <filter string="MercadoLibre Quotations" name="sale_orders_ml" domain="[('meli_order_id','!=',False)]" />
+              </xpath>
+          </field>
+      </record>
+
+
+
         <record model="ir.ui.view" id="view_meli_orders_tree">
             <field name="name">mercadolibre.orders.tree</field>
             <field name="model">mercadolibre.orders</field>
             <field name="type">tree</field>
             <field name="arch" type="xml">
-                <tree string="Ordenes" >
+                <tree string="Ordenes" default_order="date_created desc">
                     <field name="name"/>
                     <field name="order_id"/>
+                    <field name="shipping_id" invisible="0"/>
                     <field name="status"/>
                     <field name="buyer"/>
                     <field name="total_amount"/>
@@ -30,14 +59,16 @@
                 <data>
                     <notebook>
                         <page string="MercadoLibre" attrs="{'invisible':[('meli_order_id', '=', False)]}">
+                            <field name="meli_orders" invisible="0"/>
                             <group>
                               <field name="meli_order_id" invisible="0"/>
-                              <field name="meli_orders" invisible="0"/>
                               <field name="meli_status" invisible="0"/>
                               <field name="meli_shipment" invisible="0"/>
                               <field name="meli_status_detail" invisible="0"/>
                               <field name="meli_total_amount" invisible="0"/>
                               <field name="meli_shipping_cost" invisible="0"/>
+                              <field name="meli_shipping_list_cost" invisible="0"/>
+                              <field name="meli_fee_amount" invisible="0"/>
                               <field name="meli_paid_amount" invisible="0"/>
                               <field name="meli_currency_id" invisible="0"/>
                               <field name="meli_date_created" invisible="0"/>
@@ -86,29 +117,67 @@
             <field name="model">mercadolibre.orders</field>
             <field name="type">form</field>
             <field name="arch" type="xml">
-              <form string="Orden">
-                <group>
-                    <field name="name"/>
-                    <field name="order_id"/>
-                    <field name="sale_order"/>
-                    <field name="tags"/>
-                    <field name="seller"/>
-                    <field name="status"/>
-                    <field name="date_created"/>
-                    <field name="date_closed"/>
+              <form string="Orden de ML">
+                <header>
+                  <field name="status" widget="statusbar"/>
+                </header>
+                <sheet>
+                  <div class="oe_title">
+                    <h1><field name="name"/></h1>
                     <field name="status_detail"/>
-                    <field name="order_items"/>
-                    <field name="total_amount"/>
-                    <field name="shipping_cost"/>
-                    <field name="paid_amount"/>
-                    <field name="currency_id"/>
-                    <field name="buyer"/>
-                    <field name="payments"/>
-                    <field name="shipping"/>
-                    <field name="shipping_id"/>
-                    <field name="shipment"/>
+                    <field name="tags"/>
+                    <field name="order_id"/>
+                  </div>
+                  <div class="oe_button_box" name="button_box_mel" style="width: auto;">
+                    <button name='orders_update_order' type="object"
+                      string="Actualizar"
+                      attrs="{'invisible':[('order_id','=',False)]}"
+                      class="oe_stat_button"
+                      icon="fa-refresh"/>
+                  </div>
+                  <group>
+                    <group>
+                        <field name="sale_order"/>
+                        <field name="date_created"/>
+                        <field name="date_closed"/>
+                        <field name="buyer"/>
+                        <field name="seller"/>
+                    </group>
+                    <group>
+                        <field name="total_amount" widget="monetary"/>
+                        <field name="shipping_cost"  widget="monetary"/>
+                        <field name="shipping_list_cost"  widget="monetary"/>
+                        <field name="fee_amount"  widget="monetary"/>
+                        <field name="paid_amount"  widget="monetary"/>
+                        <field name="currency_id"/>
+                    </group>
                   </group>
-                </form>
+                  <notebook>
+                    <page string="Order Items">
+                      <field name="order_items" />
+                    </page>
+                    <page string="Payments">
+                      <field name="payments"/>
+                    </page>
+                    <page string="Shipments">
+                      <group>
+                        <group>
+                            <field name="shipping"/>
+                            <field name="shipping_id"/>
+                          </group>
+                          <group>
+                            <field name="shipment"/>
+                          </group>
+                      </group>
+                    </page>
+                  </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="activity_ids" widget="mail_activity"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+              </form>
             </field>
         </record>
 
@@ -119,6 +188,7 @@
             <field name="arch" type="xml">
                 <tree string="Lineas de la Orden" >
                     <field name="posting_id"/>
+                    <field name="product_id"/>
                     <field name="order_id"/>
                     <field name="order_item_id"/>
                     <field name="unit_price"/>
@@ -147,7 +217,6 @@
             </field>
         </record>
 
-<!--
     <record id="meli_orders_search_view" model="ir.ui.view">
         <field name="name">mercadolibre.orders.search</field>
         <field name="model">mercadolibre.orders</field>
@@ -156,13 +225,13 @@
              <field name="order_id" string="Order ID"/>
              <field name="status" string="Status"/>
              <field name="buyer" string="Comprador"/>
-             <field name="seller" string="Vendedor"/>
+             <!--field name="seller" string="Vendedor"/-->
 	         </search>
         </field>
     </record>
 
     <record id="meli_buyers_search_view" model="ir.ui.view">
-        <field name="name">Compradores de ML - Buscar</field>
+        <field name="name">mercadolibre.buyers.search</field>
         <field name="model">mercadolibre.buyers</field>
         <field name="arch" type="xml">
     	    <search string="Search MercadoLibre Buyers Information">
@@ -176,7 +245,6 @@
     	    </search>
         </field>
     </record>
--->
 
     <record id="view_orders_update" model="ir.ui.view">
           <field name="name">Actualizar Orden de ML</field>
@@ -186,7 +254,6 @@
             <form string="Update Order" version="7.0">
                 <footer>
                     <button name="order_update" string="Update Order"  type="object" class="oe_highlight"  />
-		or
                     <button string="Cancel" class="oe_link" special="cancel" />
                 </footer>
             </form>
@@ -247,7 +314,8 @@
                 name="Update ML Orders"
                 binding_model="mercadolibre.orders"
                 res_model="mercadolibre.orders.update"
-                binding_views="form"
+                binding_type="action"
+                binding_views="list,form"
                 view_mode="form"
                 target="new"/>
 

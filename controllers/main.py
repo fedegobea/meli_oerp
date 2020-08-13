@@ -7,7 +7,7 @@ from odoo import http, api
 from ..melisdk.meli import Meli
 
 from odoo import fields, osv
-from odoo.http import request
+from odoo.http import Controller, Response, request, route
 
 import pdb
 import logging
@@ -36,13 +36,18 @@ class MercadoLibre(http.Controller):
         meli = Meli(client_id=CLIENT_ID,client_secret=CLIENT_SECRET, access_token=ACCESS_TOKEN, refresh_token=REFRESH_TOKEN)
         response = meli.get("/items/MLA533830652")
 
-        return "MercadoLibre for Odoo 8/9/10/11 - Moldeo Interactive: %s " % response.content
+        return "MercadoLibre for Odoo 8/9/10/11/12/13 - Moldeo Interactive: %s " % response.content
 
-    @http.route(['/meli_notify'], type='json', auth="none")
+    @http.route(['/meli_notify'], type='json', auth='public')
     def meli_notify(self,**kw):
         _logger.info("meli_notify")
-        _logger.info(kw)
-        return ""
+        #_logger.info(kw)
+        company = request.env.user.company_id
+        result = company.meli_notifications()
+        if (result and "error" in result):
+            return Response(result["error"],content_type='text/html;charset=utf-8',status=result["status"])
+        else:
+            return ""
 
 class MercadoLibreLogin(http.Controller):
 
@@ -61,7 +66,7 @@ class MercadoLibreLogin(http.Controller):
         codes.setdefault('error','none')
         if codes['error']!='none':
             message = "ERROR: %s" % codes['error']
-            return "<h1>"+message+"</h1><br/><a href='"+meli.auth_url(redirect_URI=REDIRECT_URI)+"'>Login</a>"
+            return "<h5>"+message+"</h5><br/>Retry: <a href='"+meli.auth_url(redirect_URI=REDIRECT_URI)+"'>Login</a>"
 
         if codes['code']!='none':
             _logger.info( "Meli: Authorize: REDIRECT_URI: %s, code: %s" % ( REDIRECT_URI, codes['code'] ) )
@@ -101,6 +106,7 @@ class Download(http.Controller):
 
 
         def _get_datas(self):
+            self.ensure_one()
             return ustr("Stock n°%s") % self.id
 
 
@@ -125,7 +131,7 @@ class Download(http.Controller):
 
         :param str model: name of the model to fetch the data from
         :param str record_id: id of the record from which to fetch the data
-        :param str method: name of the method used to fetch data, decorated with
+        :param str method: name of the method used to fetch data, decorated with @api.one
         :param bool encoded: whether the data is encoded in base64
         :param str filename: the file's name, if any
         :returns: :class:`werkzeug.wrappers.Response`

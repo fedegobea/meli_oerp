@@ -1,49 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-  <data>
+    <data>
 
-    <record model="ir.ui.view" id="view_meli_posting_tree">
-        <field name="name">mercadolibre.posting.tree</field>
-        <field name="model">mercadolibre.posting</field>
-        <field name="type">tree</field>
-        <field name="arch" type="xml">
-            <tree string="Ventas" >
-                <field name="name"/>
-                <field name="posting_date"/>
-                <field name="product_id"/>
-                <field name="meli_seller_custom_field"/>
-                <field name="meli_id"/>
-                <field name="meli_permalink" widget="url"/>
-                <field name="meli_status"/>
-                <field name="meli_price"/>
-                <field name="posting_questions"/>
-            </tree>
-        </field>
-    </record>
+        <record model="ir.ui.view" id="view_meli_posting_tree">
+            <field name="name">mercadolibre.posting.tree</field>
+            <field name="model">mercadolibre.posting</field>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree string="Ventas publicadas"  default_order="posting_date desc">
+                    <field name="name"/>
+                    <field name="posting_date"/>
+                    <field name="product_id"/>
+                    <field name="meli_seller_custom_field"/>
+                    <field name="meli_id"/>
+                    <field name="meli_permalink" widget="url"/>
+                    <field name="meli_status"/>
+                    <field name="meli_price"/>
+                    <field name="posting_questions"/>
+                </tree>
+            </field>
+        </record>
 
 
-    <record model="ir.ui.view" id="view_meli_posting_form">
-        <field name="name">mercadolibre.posting.form</field>
-        <field name="model">mercadolibre.posting</field>
-        <field name="type">form</field>
-        <field name="arch" type="xml">
-		      <form string="Venta en ML">
-            <group>
-                <field name="name"/>
-                <field name="posting_date"/>
-                <field name="meli_id"/>
-                <field name="meli_seller_custom_field"/>
-                <field name="product_id"/>
-                <field name="meli_permalink" widget="url"/>
-                <field name="meli_status"/>
-                <field name="meli_price"/>
-                <field name="posting_questions"/>
-                <field name="posting_update"/>
-              </group>
-            </form>
-        </field>
-    </record>
-
+        <record model="ir.ui.view" id="view_meli_posting_form">
+            <field name="name">mercadolibre.posting.form</field>
+            <field name="model">mercadolibre.posting</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+				      <form string="Venta en ML">
+                <group>
+                    <field name="name"/>
+                    <field name="posting_date"/>
+                    <field name="meli_id"/>
+                    <field name="meli_seller_custom_field"/>
+                    <field name="product_id"/>
+                    <field name="meli_permalink" widget="url"/>
+                    <field name="meli_status"/>
+                    <field name="meli_price"/>
+                    <field name="posting_questions"/>
+                    <field name="posting_update"/>
+                  </group>
+                </form>
+            </field>
+        </record>
 
     <record id="meli_posting_search_view" model="ir.ui.view">
         <field name="name">MercadoLibre Posting - Search</field>
@@ -84,7 +83,7 @@
     </record>
 
     <record model="ir.actions.act_window" id="action_meli_postings_tree">
-        <field name="name">Ventas</field>
+        <field name="name">Ventas publicadas</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">mercadolibre.posting</field>
         <!--field name="view_type">form</field-->
@@ -98,13 +97,14 @@
     <menuitem id="menu_meli_postings"
         action="action_meli_postings_tree"
         parent="menu_meli"
-        name="Ventas" />
+        name="Ventas publicadas" />
 
     <act_window id="action_update_meli_postings"
         name="Update ML Post"
         binding_model="mercadolibre.posting"
         res_model="mercadolibre.posting.update"
-        binding_views="form"
+        binding_type="action"
+        binding_views="list,form"
         view_mode="form"
         target="new"/>
 

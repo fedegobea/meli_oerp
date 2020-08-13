@@ -32,12 +32,9 @@ from .meli_oerp_config import *
 from dateutil.parser import *
 from datetime import *
 
-def _ml_datetime(datestr):
-    try:
-        #return parse(datestr).isoformat().replace("T"," ")
-        return parse(datestr).strftime('%Y-%m-%d %H:%M:%S')
-    except:
-        return ""
+from . import versions
+from .versions import *
+
 
 class mercadolibre_posting_update(models.TransientModel):
     _name = "mercadolibre.posting.update"
@@ -89,7 +86,9 @@ class mercadolibre_posting(models.Model):
         #get with an item id
         company = self.env.user.company_id
         posting_obj = self.env['mercadolibre.posting']
+
         for posting in self:
+
             log_msg = 'posting_query_questions: %s' % (posting.meli_id)
             #_logger.info(log_msg)
 
@@ -136,17 +135,17 @@ class mercadolibre_posting(models.Model):
                     question_fields = {
                         'posting_id': posting.id,
                         'question_id': Question['id'],
-                        'date_created': _ml_datetime(Question['date_created']),
+                        'date_created': ml_datetime(Question['date_created']),
                         'item_id': Question['item_id'],
                         'seller_id': Question['seller_id'],
-                        'text': str(Question['text'].encode("utf-8")),
+                        'text': Question['text'].encode("utf-8"),
                         'status': Question['status'],
                     }
 
                     if (question_answer):
-                        question_fields['answer_text'] = str(question_answer['text'].encode("utf-8"))
+                        question_fields['answer_text'] = question_answer['text'].encode("utf-8")
                         question_fields['answer_status'] = question_answer['status']
-                        question_fields['answer_date_created'] = _ml_datetime(question_answer['date_created'])
+                        question_fields['answer_date_created'] = ml_datetime(question_answer['date_created'])
 
                     question = questions_obj.search( [('question_id','=',question_fields['question_id'])])
                     if not question:

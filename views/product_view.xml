@@ -2,6 +2,36 @@
 <odoo>
     <data>
 
+      <record id="product_template_search_view_meli" model="ir.ui.view">
+          <field name="name">product.template.search.meli</field>
+          <field name="model">product.template</field>
+          <field name="inherit_id" ref="product.product_template_search_view"/>
+          <field name="arch" type="xml">
+              <xpath expr="//filter[@name='consumable']" position="after">
+                <field name="meli_publications" string="Product ML Id" filter_domain="[('meli_publications','ilike',self)]"/>
+                <separator/>
+                <filter string="MercadoLibre, A publicar" name="meli_pub_active" domain="[('meli_pub','=',True)]"/>
+                <filter string="MercadoLibre, Publicados" name="meli_id_active" domain="[('meli_publications','ilike','M')]"/>
+                <filter string="MercadoLibre, Activos" name="meli_status_active" domain="[('meli_publications','ilike','active')]"/>
+              </xpath>
+          </field>
+      </record>
+
+      <record id="product_search_form_view" model="ir.ui.view">
+          <field name="name">product.product.ml.search</field>
+          <field name="model">product.product</field>
+          <field name="inherit_id" ref="product.product_search_form_view"/>
+          <field name="arch" type="xml">
+              <filter name="filter_to_purchase" position="after">
+                <field name="meli_id" string="MercadoLibre Id (ML Id)" filter_domain="[('meli_id','ilike',self)]"/>
+                <separator/>
+                <filter string="MercadoLibre, A publicar" name="meli_pub_active2" domain="[('meli_pub','=',True)]"/>
+                <filter string="MercadoLibre, Publicados" name="meli_id_active2" domain="[('meli_id','ilike','M')]"/>
+                <!--filter string="MercadoLibre, Activos" name="meli_status_active" domain="[('meli_status','ilike','active')]"/-->
+              </filter>
+          </field>
+      </record>
+
         <record model="ir.ui.view" id="product_tpl_ml_form_view">
           <field name="name">product.tpl.ml.form.inherit</field>
           <field name="model">product.template</field>
@@ -30,19 +60,27 @@
                             confirm="¿Está seguro que quiere importar los datos desde ML?"
                             class="oe_stat_button"
                           icon="fa-cloud-download"/>
+                          <button name='action_category_predictor' type="object"
+            								string="Sugerir Categoria"
+                            attrs="{'invisible':[('meli_category','!=',False)]}"
+                            class="oe_stat_button"
+                            icon="fa-refresh"/>
                         </div>
                       </group>
-                      <group string="Publicaciones">
-                        <field name="product_variant_ids" options="{'no_create': True}" domain="[('meli_id','!=',None)]">
-                          <tree>
-                            <field string="Variante" name="name"/>
-                            <field string="Id Pub" name="meli_id"/>
-                            <field string="Id Var" name="meli_id_variation"/>
-                            <field string="Status" name="meli_status"/>
-                            <field string="Link" name="meli_permalink" widget="url"/>
-                          </tree>
-                        </field>
-                      </group>
+                      <separator string="Variants" colspan="1"/>
+                      <field name="product_variant_ids" options="{'no_create': True}" domain="[('meli_id','!=',None)]">
+                        <tree>
+                          <field string="Id Pub" name="meli_id"/>
+                          <field string="Id Var" name="meli_id_variation"/>
+                          <field string="Variant" name="name"/>
+                          <field string="Status" name="meli_status"/>
+                          <field string="Sub Status" name="meli_sub_status"/>
+                          <field string="ML Title" name="meli_title"/>
+                          <field string="ML Price" name="meli_price"/>
+                          <field string="ML Qty" name="meli_available_quantity"/>
+                          <field string="Link" name="meli_permalink" widget="url"/>
+                        </tree>
+                      </field>
                       <separator string="Descripcion del producto en ML" colspan="1"/>
                       <group name="Basic description">
                         <field name="meli_title" />
@@ -96,7 +134,7 @@
                     <div name="button_box" position="inside">
                         <button type="object"
                             name="action_meli_pause"
-                            attrs="{'invisible':[('meli_variants_status', '!=', 'active')]}"
+                            attrs="{'invisible':[('meli_variants_status', '!=', 'active')] }"
                             class="oe_stat_button">
                             <img src="/meli_oerp/static/src/img/logo_ML.png" width="48" alt="logo ml"/>
                             <span>Pausar en ML</span>
@@ -138,6 +176,7 @@
                     <field name="meli_id" invisible="0"/>
                     <field name="meli_id_variation" invisible="0"/>
                     <field name="meli_status" invisible="1"/>
+                    <field name="meli_sub_status" invisible="1"/>
                 </field>
             </field>
         </record>
@@ -150,6 +189,7 @@
                 <data>
                     <div name="button_box" position="inside">
                         <field name="meli_status" invisible="1"/>
+                        <field name="meli_sub_status" invisible="1"/>
                         <button type="object"
                             name="product_meli_status_pause"
                             attrs="{'invisible':[('meli_status', '!=', 'active')]}"
@@ -159,7 +199,7 @@
                         </button>
                         <button type="object"
                             name="product_meli_status_active"
-                            attrs="{'invisible':[('meli_status', '!=', 'paused')]}"
+                            attrs="{'invisible':[('meli_status', '!=', 'paused')] }"
                             class="oe_stat_button">
                             <img src="/meli_oerp/static/src/img/logo_ML.png" width="48"  alt="logo ml"/>
                             <span>Activar</span>
@@ -206,6 +246,11 @@
                               attrs="{'invisible':['|',('meli_state','=',True),('meli_id','=',False)]}"
                               class="oe_stat_button"
               								icon="fa-cloud-download"/>
+                              <button name='action_category_predictor' type="object"
+                								string="Sugerir Categoria"
+                                class="oe_stat_button"
+                                icon="fa-refresh"
+                								attrs="{'invisible':['|',('meli_state','=',True),('meli_category','!=',False)]}" />
                             <button name='%(action_product_post)d' type="action"
                               string="Publicar"
                               title="Publicar producto en ML"
@@ -266,9 +311,10 @@
                           </div>
                           <group string="Informacion de ML">
                             <group>
-                              <field name="meli_post_required" />
+                              <field name="meli_post_required" invisible="1" />
                               <field name="meli_status" />
-                              <field name="meli_state" />
+                              <field name="meli_sub_status" />
+                              <field name="meli_state" invisible="1" />
                             </group>
                             <group>
                               <field name="meli_permalink" widget="url" />
